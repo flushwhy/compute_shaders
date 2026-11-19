@@ -98,7 +98,13 @@ Each pair contains:
 
 This matches the feature layout currently assembled in ML-phys. The kernel fuses the expanded views, relative feature calculation, and concatenation into one Metal dispatch.
 
-The first version is intentionally forward-only. The state tensor is input data and must not require gradients. Model parameter gradients still flow normally through the PyTorch pair encoder that consumes the returned tensor.
+The feature-only kernel is intentionally forward-only. Its state tensor must not require gradients; model parameter gradients still flow normally through the PyTorch pair encoder that consumes the returned tensor.
+
+## Fused pair projection (experimental)
+
+The library also exposes `MPSKernelLibrary.project_pair_features(states, weight, bias)`. It constructs the same 28 pair features and applies the first linear projection in one Metal dispatch, without writing the full pair-feature tensor during the forward pass.
+
+A custom autograd backward recomputes pair features and returns gradients for the input states, projection weights, and bias. This supports multi-step training rollouts, where later states depend on earlier predictions. It is currently experimental: on the M1 Max benchmark, the fused path was slightly slower than the PyTorch reference at the tested batch sizes. See [docs/performance.md](docs/performance.md).
 
 ## Benchmark
 
@@ -111,7 +117,7 @@ PYTHONPATH=python python benchmarks/benchmark_pair_features.py \
 
 The benchmark checks exact output equality before measuring. It synchronizes MPS around each timed operation. Do not assume a custom kernel is faster: dispatch overhead and memory traffic can outweigh the savings for small tensors.
 
-Initial M1 Max measurements are recorded in [docs/performance.md](docs/performance.md). The feature-building operation was about 4.4× faster in isolation; a synthetic three-step training-style rollout improved by about 8%. These are early measurements, not general performance guarantees.
+Initial M1 Max measurements are recorded in [docs/performance.md](docs/performance.md). The feature-building operation was about 4.4× faster in isolation. Full-rollout gains were much smaller and varied by batch size, so the kernels remain opt-in. These are early measurements, not general performance guarantees.
 
 ## Using the kernel in ML-phys
 
@@ -134,14 +140,17 @@ python training/train_interaction.py \
 
 The option is off by default. CUDA, CPU, and the normal PyTorch MPS path remain unchanged unless explicitly enabled.
 
+The experimental fused pair projection can be tested separately with `--metal-fused-pair-encoder`. It includes a custom backward for state, weight, and bias gradients, but current full-rollout benchmarks do not show a speedup.
+
 ## Project status
 
 - [x] Runtime compilation through PyTorch MPS
 - [x] Fused pair-feature assembly kernel
+- [x] Fused pair projection with custom autograd backward (experimental)
 - [x] Python API and input validation
-- [x] Exact correctness tests against the PyTorch reference
-- [x] ML-phys integration behind an opt-in switch
-- [ ] Additional fused kernels and backward implementations where needed
+- [x] Correctness tests against the PyTorch reference
+- [x] ML-phys integration behind opt-in switches
+- [ ] Faster tiled projection kernel
 - [ ] Vulkan backend
 - [ ] Wheels, release automation, and broader hardware CI
 

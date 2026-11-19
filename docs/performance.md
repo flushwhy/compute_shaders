@@ -23,16 +23,18 @@ The vectorized float4 kernel with a 256-thread group was the best of these teste
 
 ## Model-level measurements
 
-| Workload | PyTorch | Custom Metal | Speedup |
+The model-level numbers below were rerun with the fused projection implementation. Each measurement is a median of synchronized forward/backward samples after warm-up, using synthetic states and targets with 20 bodies, hidden width 128, and pair width 96.
+
+| Workload | PyTorch | Metal features only | Fused Metal projection |
 |---|---:|---:|---:|
-| Full model forward/backward, batch 1,024 | 75.847 ms | 75.847 ms | 1.00× |
-| Three-step rollout forward/backward, batch 256 | 111.012 ms | 102.397 ms | 1.08× |
+| Three-step rollout, batch 256 | 107.72 ms | 107.76 ms | 111.97 ms |
+| Three-step rollout, batch 1,024 | 258.12 ms | 253.59 ms | 265.08 ms |
 
-The three-step rollout used synthetic states and targets, 20 bodies, and 12 paired synchronized samples after warm-up. It is closer to the training loop than the isolated kernel benchmark, but it is still not a full dataset training run.
+At batch 1,024 the feature-only kernel was about 1.8% faster in this run. The fused projection was about 2.6% slower. At batch 256, both custom paths were within a few percent of the reference. These small differences are close enough that they should be treated as workload- and run-dependent, not as guaranteed gains.
 
-This is the important qualification: accelerating feature assembly does not automatically accelerate the full model. The pair encoder and the rest of the training graph dominate enough of the runtime that a single forward/backward pass showed no measurable difference. The rollout benchmark showed a modest improvement of about 8%.
+The fused kernel is still useful as an experimental implementation and as a way to avoid materializing the 28-value pair tensor during the forward pass. Its custom autograd backward recomputes those features and returns gradients for states, weights, and bias. That backward recomputation currently costs enough to erase the expected speedup.
 
-The custom path therefore remains opt-in. More useful gains likely require fusing feature generation with the first pair-encoder projection, while preserving gradients for the model weights.
+For now, use `--metal-kernels` to test the feature-only kernel. Keep `--metal-fused-pair-encoder` experimental until a better tiled matrix implementation improves full-rollout throughput.
 
 ## Reproducing
 

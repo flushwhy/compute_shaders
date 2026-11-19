@@ -1,4 +1,4 @@
-name: MPS kernel tests
+name: macOS package and MPS tests
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  mps:
+  macos:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -14,15 +14,15 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install package and PyTorch
+      - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[mps,dev]"
-      - name: Run unit and GPU correctness tests
+      - name: Run API and available GPU correctness tests
         env:
           PYTHONPATH: python
         run: python -m unittest discover -s tests -v
-      - name: Verify runtime shader compilation
+      - name: Verify Metal kernel when a GPU is exposed
         env:
           PYTHONPATH: python
         run: python scripts/verify_mps.py

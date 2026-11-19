@@ -18,7 +18,7 @@ classifiers = [
 
 [project.optional-dependencies]
 mps = ["torch>=2.7"]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "numpy>=1.26"]
 
 [tool.setuptools]
 package-dir = {"" = "python"}

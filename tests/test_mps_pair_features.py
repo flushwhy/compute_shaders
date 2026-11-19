@@ -2,7 +2,18 @@ import unittest
 
 import torch
 
-from computeshaders.mps import MPSKernelLibrary, MPSUnavailableError
+from computeshaders.mps import MPSKernelLibrary
+
+
+class MPSInputValidationTests(unittest.TestCase):
+    def test_pair_feature_input_rejects_non_tensor_values(self):
+        with self.assertRaisesRegex(TypeError, "torch.Tensor"):
+            MPSKernelLibrary.validate_pair_feature_input(None)
+
+    def test_pair_feature_input_rejects_cpu_tensors(self):
+        states = torch.randn((1, 2, 12), dtype=torch.float32)
+        with self.assertRaisesRegex(ValueError, "MPS device"):
+            MPSKernelLibrary.validate_pair_feature_input(states)
 
 
 @unittest.skipUnless(torch.backends.mps.is_available(), "Apple MPS is not available")

@@ -67,6 +67,8 @@ PYTHON=python3 ./metal/build.sh
 
 The shader is compiled by PyTorch at runtime. This avoids requiring a separately built native extension or a precompiled library for the initial MPS backend.
 
+GitHub's standard macOS runners may not expose a Metal GPU even when the host architecture is Apple Silicon. In that case, the hosted workflow runs the API/packaging tests and explicitly skips the hardware shader check. The full GPU tests run on a physical MPS-capable Mac.
+
 ## Example
 
 ```python

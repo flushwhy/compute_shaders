@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "computeshaders"
+version = "0.1.0"
+description = "Reusable Metal compute kernels for Apple Silicon and PyTorch MPS"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: GPU",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+mps = ["torch>=2.7"]
+dev = ["pytest>=8"]
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+computeshaders = ["kernels/*.metal"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

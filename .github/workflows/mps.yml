@@ -1,0 +1,28 @@
+name: MPS kernel tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mps:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package and PyTorch
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[mps,dev]"
+      - name: Run unit and GPU correctness tests
+        env:
+          PYTHONPATH: python
+        run: python -m unittest discover -s tests -v
+      - name: Verify runtime shader compilation
+        env:
+          PYTHONPATH: python
+        run: python scripts/verify_mps.py

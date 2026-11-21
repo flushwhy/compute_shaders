@@ -4,14 +4,14 @@
 
 The goal is simple: make it easy to write, test, benchmark, and distribute compute kernels that operate directly on GPU tensors.
 
-> Early development: the first kernel is an MPS pair-feature builder based on the interaction model in ML-phys. APIs may change before the first stable release.
+> Early development: the library contains reusable MPS kernels for ML-phys pair features and FastSpeech2 length regulation. APIs may change before the first stable release.
 
 ## Why this project exists
 
 Framework-provided GPU operations are convenient, but a workload can sometimes benefit from a fused kernel designed around its exact memory layout and access pattern.
 
 Compute Shaders keeps those experiments reusable:
-- Metal shader source lives in `metal/`.
+- Metal shader source lives in `python/computeshaders/kernels/`.
 - Python wrappers live in `python/computeshaders/`.
 - Correctness tests live in `tests/`.
 - Benchmarks live in `benchmarks/`.
@@ -106,6 +106,39 @@ The library also exposes `MPSKernelLibrary.project_pair_features(states, weight,
 
 A custom autograd backward recomputes pair features and returns gradients for the input states, projection weights, and bias. This supports multi-step training rollouts, where later states depend on earlier predictions. It is currently experimental: on the M1 Max benchmark, the fused path was slightly slower than the PyTorch reference at the tested batch sizes. See [docs/performance.md](docs/performance.md).
 
+## FastSpeech2 length regulation
+
+The library includes an MPS implementation of the FastSpeech2 length regulator. It replaces the Python batch/phoneme loops and repeated `.item()` calls with a Metal dispatch. Each output frame independently finds its source phoneme using a binary search over exclusive duration prefix sums.
+
+The forward and backward passes are custom Metal kernels. The backward pass sums each repeated frame's gradient back into its source phoneme, so the operation remains usable during model training.
+
+```python
+import torch
+from computeshaders import MPSLengthRegulator
+
+length_regulator = MPSLengthRegulator()
+hidden_states = torch.randn(8, 100, 256, device="mps", dtype=torch.float32)
+durations = torch.randint(1, 6, (8, 100), device="mps", dtype=torch.int32)
+
+expanded, mel_lengths = length_regulator(hidden_states, durations)
+```
+
+Inputs must be MPS tensors: float32 states shaped `(batch, source_length, hidden_size)`, and int32/int64 durations shaped `(batch, source_length)`. Negative durations are treated as zero. Pass `max_len` when the padded output width is already known; omitting it requires one scalar synchronization to determine the output shape.
+
+Run the correctness tests on an MPS-capable Mac:
+
+```bash
+PYTHONPATH=python python -m unittest discover -s tests -v
+```
+
+Run the loop-vs-Metal benchmark:
+
+```bash
+PYTHONPATH=python python benchmarks/benchmark_length_regulator.py --warmup 5 --repetitions 30
+```
+
+The benchmark compares against the original loop-based behavior, checks output and length equality, and reports both forward-only and forward-plus-backward timings. These are isolated operation measurements, not end-to-end FastSpeech model speedups. See [docs/performance.md](docs/performance.md) for the current M1 Max results.
+
 ## Benchmark
 
 Run the benchmark against the original PyTorch expression:
@@ -149,6 +182,7 @@ The experimental fused pair projection can be tested separately with `--metal-fu
 - [x] Fused pair projection with custom autograd backward (experimental)
 - [x] Python API and input validation
 - [x] Correctness tests against the PyTorch reference
+- [x] FastSpeech2 length regulation with custom Metal forward/backward kernels
 - [x] ML-phys integration behind opt-in switches
 - [ ] Faster tiled projection kernel
 - [ ] Vulkan backend

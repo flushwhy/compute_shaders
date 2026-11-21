@@ -1,0 +1,24 @@
+name: Vulkan shader compilation
+
+on:
+  push:
+    paths:
+      - "vulkan/**"
+      - ".github/workflows/vulkan.yml"
+  pull_request:
+    paths:
+      - "vulkan/**"
+      - ".github/workflows/vulkan.yml"
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GLSL compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes glslang-tools
+      - name: Compile compute shaders to SPIR-V
+        run: ./vulkan/build.sh

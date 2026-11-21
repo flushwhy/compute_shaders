@@ -45,14 +45,14 @@ This benchmark compares the original FastSpeech2-style Python implementation (a 
 - PyTorch: 2.7.0
 - dtype: float32 states, int32 durations
 - Warm-up: 5 calls
-- Repetitions: 15
+- Repetitions: 30
 - Measurement: median of synchronized per-call timings
 
 | Case | Batch | Source length | Hidden width | Python loop forward | Metal forward | Forward speedup | Python loop train step | Metal train step | Training speedup |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Small | 2 | 30 | 256 | 18.566 ms | 0.831 ms | 22.34× | 22.786 ms | 1.144 ms | 19.92× |
-| Medium | 8 | 100 | 256 | 215.560 ms | 0.844 ms | 255.31× | 254.864 ms | 1.193 ms | 213.67× |
-| Large | 16 | 200 | 256 | 916.250 ms | 1.262 ms | 725.96× | 1,072.644 ms | 2.293 ms | 467.86× |
+| Small | 2 | 30 | 256 | 13.428 ms | 0.725 ms | 18.53× | 17.766 ms | 0.854 ms | 20.81× |
+| Medium | 8 | 100 | 256 | 170.884 ms | 0.761 ms | 224.61× | 206.929 ms | 0.929 ms | 222.81× |
+| Large | 16 | 200 | 256 | 729.697 ms | 0.801 ms | 911.50× | 881.459 ms | 1.445 ms | 610.09× |
 
 These are isolated length-regulation measurements from one benchmark run, not end-to-end FastSpeech training speedups. The large gains come primarily from removing the per-phoneme Python loop and its repeated GPU-to-CPU synchronizations. The custom implementation still performs a prefix sum and one scalar synchronization when `max_len` is omitted; callers that already know the padded width can pass it to avoid that synchronization.
 

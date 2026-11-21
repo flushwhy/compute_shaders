@@ -1,0 +1,55 @@
+#version 450
+
+// One invocation builds one (batch, target, neighbor) feature vector.
+// Buffer layout matches MPSKernelLibrary.build_pair_features:
+//   input:  (batch, bodies, 12) float32
+//   output: (batch, bodies, bodies, 28) float32
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, set = 0, binding = 0) readonly buffer States {
+    float values[];
+} states;
+
+layout(std430, set = 0, binding = 1) writeonly buffer PairFeatures {
+    float values[];
+} output_data;
+
+layout(push_constant) uniform Parameters {
+    uint bodies;
+    uint batch_size;
+} params;
+
+void main() {
+    const uint pair_index = gl_GlobalInvocationID.x;
+    const uint pairs_per_batch = params.bodies * params.bodies;
+    const uint total_pairs = params.batch_size * pairs_per_batch;
+
+    if (pair_index >= total_pairs) {
+        return;
+    }
+
+    const uint batch = pair_index / pairs_per_batch;
+    const uint pair = pair_index % pairs_per_batch;
+    const uint target = pair / params.bodies;
+    const uint neighbor = pair % params.bodies;
+
+    const uint target_base = (batch * params.bodies + target) * 12;
+    const uint neighbor_base = (batch * params.bodies + neighbor) * 12;
+    const uint output_base = pair_index * 28;
+
+    // Copy the two source states without changing their feature order.
+    for (uint i = 0; i < 12; ++i) {
+        output_data.values[output_base + i] = states.values[target_base + i];
+        output_data.values[output_base + 12 + i] = states.values[neighbor_base + i];
+    }
+
+    // Relative position and velocity: x/y and vx/vy.
+    output_data.values[output_base + 24] =
+        states.values[neighbor_base] - states.values[target_base];
+    output_data.values[output_base + 25] =
+        states.values[neighbor_base + 1] - states.values[target_base + 1];
+    output_data.values[output_base + 26] =
+        states.values[neighbor_base + 3] - states.values[target_base + 3];
+    output_data.values[output_base + 27] =
+        states.values[neighbor_base + 4] - states.values[target_base + 4];
+}
